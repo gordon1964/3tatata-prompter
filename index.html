@@ -43,7 +43,9 @@
   #story-label{font-family:'Playfair Display',serif;font-size:.95rem;color:var(--accent);text-align:center;flex:1;padding:0 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #progress-bar{height:3px;background:var(--accent);width:0%;flex-shrink:0;z-index:9;transition:width .15s ease}
   #guide-line{position:absolute;top:50%;left:0;right:0;height:2px;background:rgba(200,169,110,.2);z-index:5;pointer-events:none}
-  #scroll-container{flex:1;overflow:hidden;position:relative;cursor:pointer}
+  #scroll-container{flex:1;overflow-y:auto;position:relative;cursor:pointer;-webkit-overflow-scrolling:touch}
+  #scroll-container::-webkit-scrollbar{display:none}
+  #scroll-container{scrollbar-width:none;-ms-overflow-style:none}
   #scroll-inner{padding:60vh 28px 60vh;line-height:1.6}
 
   .line-title{font-family:'Playfair Display',serif;font-size:1.5rem;color:var(--accent);text-align:center;margin-bottom:8px;display:block}
@@ -103,7 +105,7 @@
   </div>
   <div id="progress-bar"></div>
   <div id="guide-line"></div>
-  <div id="scroll-container" onclick="togglePlay()">
+  <div id="scroll-container">
     <div id="scroll-inner"></div>
   </div>
   <div id="tap-left" onclick="slowDown();event.stopPropagation()"></div>
@@ -229,6 +231,44 @@ function parseTextFile(text,filename){
   }
   return{id:100+Math.random(),title:lines[0]||filename,tag:'GitHub',sections};
 }
+
+// ── Touch swipe (przesuwanie palcem) ──────────────────────────────
+(function(){
+  let touchStartY=0, touchStartScroll=0, isDrag=false, moved=false, lastTouch=0;
+  const TAP_THRESHOLD=8;
+  const sc=document.getElementById('scroll-container');
+
+  // Desktop: kliknięcie myszą = play/pauza (ignoruj jeśli tuż po touchend)
+  sc.addEventListener('click',function(e){
+    if(Date.now()-lastTouch<400)return; // pochodzi z dotyku — ignoruj
+    togglePlay();
+  });
+
+  sc.addEventListener('touchstart',function(e){
+    if(e.touches.length!==1)return;
+    touchStartY=e.touches[0].clientY;
+    touchStartScroll=this.scrollTop;
+    isDrag=true;
+    moved=false;
+  },{passive:true});
+
+  sc.addEventListener('touchmove',function(e){
+    if(!isDrag||e.touches.length!==1)return;
+    const dy=touchStartY-e.touches[0].clientY;
+    if(Math.abs(dy)>TAP_THRESHOLD) moved=true;
+    this.scrollTop=touchStartScroll+dy;
+    scrollPos=this.scrollTop;
+    const max=this.scrollHeight-this.clientHeight;
+    if(max>0){updateProgress(scrollPos/max);updateActiveLine();}
+  },{passive:true});
+
+  sc.addEventListener('touchend',function(e){
+    lastTouch=Date.now();
+    if(!moved) togglePlay();
+    isDrag=false;
+    moved=false;
+  },{passive:true});
+})();
 
 loadGitHubConfig();
 renderMenu();
